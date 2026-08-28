@@ -1,0 +1,75 @@
+<mujoco model="two_wheeled_robot">
+  <compiler angle="degree"/>
+  <option timestep="0.005" gravity="0 0 -9.81"/>
+
+  <asset>
+    <!-- Checkerboard floor texture for clear visual motion tracking -->
+    <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1="0.1 0.1 0.1" rgb2="0.95 0.95 0.95"/>
+    <material name="grid_mat" texture="grid" texrepeat="5 5" reflectance="0.1"/>
+    
+    <!-- Monochrome Materials -->
+    <material name="matte_black" rgba="0.1 0.1 0.1 1" shininess="0.1"/>
+    <material name="dark_grey" rgba="0.25 0.25 0.25 1" shininess="0.3"/>
+    <material name="light_grey" rgba="0.65 0.65 0.65 1" shininess="0.5"/>
+    <material name="bright_white" rgba="0.95 0.95 0.95 1" shininess="0.8"/>
+  </asset>
+
+  <default>
+    <!-- High friction on wheels so they roll without slipping -->
+    <geom friction="1.5 0.005 0.0001" contype="1" conaffinity="1"/>
+  </default>
+
+  <worldbody>
+    <!-- Floor plane sitting at Z = 0 -->
+    <geom name="floor" type="plane" size="5 5 0.1" material="grid_mat"/>
+    
+    <!-- Main Chassis Body placed at wheel hub level (Z = 0.08) -->
+    <body name="chassis" pos="0 0 0.08">
+      <freejoint name="root"/>
+      
+      <!-- Center Axle Rod connecting wheels -->
+      <geom name="axle" type="cylinder" size="0.015 0.13" zaxis="0 1 0" material="dark_grey" mass="0.1"/>
+
+      <!-- Main Chassis Box (Matte Black) -->
+      <geom name="chassis_box" type="box" size="0.08 0.10 0.2" mass="1.3" material="matte_black" pos="0 0 0.22"/>
+      
+      <!-- Decorative Side Inset Panels (Bright White) -->
+      <geom name="panel_left" type="box" size="0.081 0.002 0.16" mass="0.02" material="bright_white" pos="0 0.101 0.22"/>
+      <geom name="panel_right" type="box" size="0.081 0.002 0.16" mass="0.02" material="bright_white" pos="0 -0.101 0.22"/>
+
+      <!-- Top Sensor Deck & Status Dome -->
+      <geom name="top_plate" type="box" size="0.085 0.105 0.01" mass="0.05" material="dark_grey" pos="0 0 0.43"/>
+      <geom name="sensor_dome" type="sphere" size="0.03" mass="0.01" material="bright_white" pos="0 0 0.45"/>
+
+      <!-- Left Wheel Assembly (White Rim, Dark Hub, Black Rubber Tire) -->
+      <body name="left_wheel" pos="0 0.14 0">
+        <joint name="left_wheel_joint" type="hinge" axis="0 1 0"/>
+        <!-- Main Outer Tire -->
+        <geom name="left_wheel_geom" type="cylinder" size="0.08 0.02" zaxis="0 1 0" mass="0.15" material="matte_black"/>
+        <!-- Inner Rim Detail -->
+        <geom name="left_wheel_rim" type="cylinder" size="0.05 0.021" zaxis="0 1 0" mass="0.05" material="bright_white"/>
+        <geom name="left_wheel_hub" type="cylinder" size="0.02 0.022" zaxis="0 1 0" mass="0.01" material="dark_grey"/>
+      </body>
+
+      <!-- Right Wheel Assembly (White Rim, Dark Hub, Black Rubber Tire) -->
+      <body name="right_wheel" pos="0 -0.14 0">
+        <joint name="right_wheel_joint" type="hinge" axis="0 1 0"/>
+        <!-- Main Outer Tire -->
+        <geom name="right_wheel_geom" type="cylinder" size="0.08 0.02" zaxis="0 1 0" mass="0.15" material="matte_black"/>
+        <!-- Inner Rim Detail -->
+        <geom name="right_wheel_rim" type="cylinder" size="0.05 0.021" zaxis="0 1 0" mass="0.05" material="bright_white"/>
+        <geom name="right_wheel_hub" type="cylinder" size="0.02 0.022" zaxis="0 1 0" mass="0.01" material="dark_grey"/>
+      </body>
+    </body>
+  </worldbody>
+
+  <contact>
+    <exclude body1="chassis" body2="left_wheel"/>
+    <exclude body1="chassis" body2="right_wheel"/>
+  </contact>
+
+  <actuator>
+    <motor joint="left_wheel_joint" name="left_motor" gear="1" ctrlrange="-10 10"/>
+    <motor joint="right_wheel_joint" name="right_motor" gear="1" ctrlrange="-10 10"/>
+  </actuator>
+</mujoco>
