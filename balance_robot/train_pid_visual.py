@@ -3,7 +3,6 @@ from pathlib import Path
 import mujoco
 import mujoco.viewer
 import numpy as np
-from skopt import gp_minimize
 
 # Absolute path resolution for model file
 script_dir = Path(__file__).resolve().parent
@@ -12,130 +11,158 @@ xml_path = script_dir / "models" / "inverted_pendulum.xml"
 model = mujoco.MjModel.from_xml_path(str(xml_path))
 data = mujoco.MjData(model)
 
-left_motor_id = model.actuator("left_motor").id
-right_motor_id = model.actuator("right_motor").id
-chassis_id = model.body("chassis").id
-
+NUM_ROBOTS = 10
 dt = model.opt.timestep
 
-def get_chassis_pitch(model, data):
-    R = data.xmat[chassis_id].reshape(3, 3)
+# Index mapping for all 10 robots
+chassis_ids = [model.body(f"chassis_{i}").id for i in range(NUM_ROBOTS)]
+left_motor_ids = [model.actuator(f"lm_{i}").id for i in range(NUM_ROBOTS)]
+right_motor_ids = [model.actuator(f"rm_{i}").id for i in range(NUM_ROBOTS)]
+
+def get_chassis_pitch(data, body_id):
+    """Calculates pitch angle (rad) around local Y-axis."""
+    R = data.xmat[body_id].reshape(3, 3)
     return np.arctan2(-R[2, 0], np.sqrt(R[0, 0]**2 + R[1, 1]**2))
 
-# Global reference to viewer so the RL loop can render live steps
-viewer_handle = None
-trial_counter = 0
-
-def evaluate_pid_visually(gains):
-    global trial_counter
-    trial_counter += 1
-    
-    Kp_pitch, Ki_pitch, Kd_pitch = gains
-    print(f"\n--- [Iteration {trial_counter}] Testing Gains: Kp={Kp_pitch:.1f}, Ki={Ki_pitch:.2f}, Kd={Kd_pitch:.1f} ---")
-    
-    # Outer position loop gains
-    Kp_pos = 0.12
-    Kd_pos = 0.25
-
+def reset_all_robots():
+    """Resets all 10 robots on their Y-axis grid spots and applies forward jolt."""
     mujoco.mj_resetData(model, data)
+    y_positions = np.linspace(-2.0, 2.5, NUM_ROBOTS)
     
-    # Reset robot state: Spawn at center with forward jolt
-    data.qpos[0] = 0.0   # X position
-    data.qpos[2] = 0.08  # Z height (Wheels on ground)
-    data.qvel[0] = 1.2   # Initial forward jolt impulse (1.2 m/s)
-    
+    for i in range(NUM_ROBOTS):
+        qpos_adr = model.jnt_qposadr[model.body(f"chassis_{i}").jntadr[0]]
+        qvel_adr = model.jnt_dofadr[model.body(f"chassis_{i}").jntadr[0]]
+
+        data.qpos[qpos_adr + 0] = 0.0            # X position
+        data.qpos[qpos_adr + 1] = y_positions[i]  # Y position
+        data.qpos[qpos_adr + 2] = 0.08           # Z height
+        data.qvel[qvel_adr + 0] = 1.0            # Forward impulse (1.0 m/s)
+        
     mujoco.mj_forward(model, data)
 
-    integral_pitch_error = 0.0
-    target_pitch_filtered = 0.0
-    total_cost = 0.0
+def run_wave(population_gains, viewer):
+    reset_all_robots()
     
-    episode_steps = 300  # ~1.5 seconds per iteration episode
+    integral_errors = np.zeros(NUM_ROBOTS)
+    target_pitch_filtered = np.zeros(NUM_ROBOTS)
+    total_costs = np.zeros(NUM_ROBOTS)
+    fell_over = [False] * NUM_ROBOTS
     
+    # Outer Loop: Gentle position pull to prevent fighting the inner loop
+    Kp_pos = 0.035
+    episode_steps = 300  # 1.5 seconds evaluation period
+
     for step in range(episode_steps):
         step_start = time.time()
+        
+        for i in range(NUM_ROBOTS):
+            if fell_over[i]:
+                continue
 
-        current_x = data.qpos[0]
-        current_vx = data.qvel[0]
-        current_pitch = get_chassis_pitch(model, data)
-        pitch_velocity = data.qvel[4]
+            qpos_adr = model.jnt_qposadr[model.body(f"chassis_{i}").jntadr[0]]
+            qvel_adr = model.jnt_dofadr[model.body(f"chassis_{i}").jntadr[0]]
 
-        # Early Termination Penalty: Robot fell over completely (~45 degrees)
-        if abs(current_pitch) > 0.8:
-            total_cost += 5000.0 + (episode_steps - step) * 10.0
-            print("❌ Tipped Over! High Penalty Assigned.")
-            break
+            current_x = data.qpos[qpos_adr + 0]
+            current_vx = data.qvel[qvel_adr + 0]
+            current_pitch = get_chassis_pitch(data, chassis_ids[i])
+            pitch_velocity = data.qvel[qvel_adr + 4]
 
-        # Outer Loop: Position to Target Pitch
-        pos_error = 0.0 - current_x
-        raw_target_pitch = (Kp_pos * pos_error) - (Kd_pos * current_vx)
-        raw_target_pitch = np.clip(raw_target_pitch, -0.14, 0.14)
-        target_pitch_filtered = (0.95 * target_pitch_filtered) + (0.05 * raw_target_pitch)
+            # Cut power and apply heavy cost if robot falls or violent bounce occurs
+            if abs(current_pitch) > 0.6:
+                fell_over[i] = True
+                total_costs[i] += 10000.0
+                data.ctrl[left_motor_ids[i]] = 0.0
+                data.ctrl[right_motor_ids[i]] = 0.0
+                continue
 
-        # Inner Loop: Pitch PID Controller
-        pitch_error = target_pitch_filtered - current_pitch
-        integral_pitch_error += pitch_error * dt
-        integral_pitch_error = np.clip(integral_pitch_error, -1.0, 1.0)
+            Kp_pitch, Ki_pitch, Kd_pitch = population_gains[i]
 
-        torque = -1.0 * (
-            (Kp_pitch * pitch_error) + 
-            (Ki_pitch * integral_pitch_error) - 
-            (Kd_pitch * pitch_velocity)
-        )
-        torque = np.clip(torque, -8.0, 8.0)
+            # 1. Outer Loop (Position Error -> Pitch Setpoint, limited to ±4 degrees)
+            pos_error = 0.0 - current_x
+            raw_target_pitch = Kp_pos * pos_error
+            raw_target_pitch = np.clip(raw_target_pitch, -0.07, 0.07)
+            target_pitch_filtered[i] = (0.92 * target_pitch_filtered[i]) + (0.08 * raw_target_pitch)
 
-        data.ctrl[left_motor_id] = torque
-        data.ctrl[right_motor_id] = torque
+            # 2. Inner Loop (Pitch Error + Angular Damping -> Wheel Torque)
+            pitch_error = target_pitch_filtered[i] - current_pitch
+            integral_errors[i] += pitch_error * dt
+            integral_errors[i] = np.clip(integral_errors[i], -0.5, 0.5)
+
+            # Direct PD formulation without loop interference
+            torque = -1.0 * (
+                (Kp_pitch * pitch_error) + 
+                (Ki_pitch * integral_errors[i]) - 
+                (Kd_pitch * pitch_velocity)
+            )
+            torque = np.clip(torque, -6.0, 6.0)
+
+            data.ctrl[left_motor_ids[i]] = torque
+            data.ctrl[right_motor_ids[i]] = torque
+
+            # Accumulate cost (heavily penalize pitch velocity to eliminate bouncing)
+            total_costs[i] += (current_x**2) * 10.0 + (current_pitch**2) * 100.0 + (pitch_velocity**2) * 5.0
 
         mujoco.mj_step(model, data)
+        if viewer and viewer.is_running():
+            viewer.sync()
 
-        # Sync visual frame to interactive window
-        if viewer_handle is not None and viewer_handle.is_running():
-            viewer_handle.sync()
-
-        # Step-wise Cost: Penalizes position drift from 0, tilt angle, and motor effort
-        step_cost = (current_x ** 2) * 15.0 + (current_pitch ** 2) * 60.0 + (torque ** 2) * 0.01
-        total_cost += step_cost
-
-        # Pacing to keep physics at real-time speed for human viewing
+        # Real-time synchronization
         time_to_sleep = dt - (time.time() - step_start)
         if time_to_sleep > 0:
             time.sleep(time_to_sleep)
 
-    print(f"Episode Finish. Cost: {total_cost:.1f}")
-    return total_cost
+    best_idx = np.argmin(total_costs)
+    best_cost = total_costs[best_idx]
+    
+    # Success threshold: Cost under 250 means ZERO bouncing and rock-solid stabilization
+    success = (best_cost < 250.0) and not fell_over[best_idx]
+    
+    return success, best_idx, population_gains[best_idx], total_costs
 
 # -------------------------------------------------------------
-# MAIN TRAINER LOOP WITH LIVE WINDOW
+# MAIN TRAINER LOOP
 # -------------------------------------------------------------
-print("Launching Live Visual PID RL Optimization...")
+print("Launching 10-Robot Smooth PID Optimization...")
 
-# Open native viewer window
 with mujoco.viewer.launch_passive(model, data) as viewer:
-    viewer_handle = viewer
+    np.random.seed(42)
     
-    search_space = [
-        (10.0, 90.0),  # Kp bounds
-        (0.0, 3.0),    # Ki bounds
-        (0.5, 10.0)    # Kd bounds
-    ]
+    # Initial gains tuned for smooth balancing (Moderate Kp, High Kd damping)
+    population = []
+    for _ in range(NUM_ROBOTS):
+        kp = np.random.uniform(18.0, 45.0)
+        ki = np.random.uniform(0.01, 0.5)
+        kd = np.random.uniform(3.0, 7.5)
+        population.append([kp, ki, kd])
 
-    # Run Bayesian Optimization over 12 iterations
-    result = gp_minimize(
-        func=evaluate_pid_visually,
-        dimensions=search_space,
-        n_calls=50,
-        random_state=42
-    )
-
-    print("\n==========================================")
-    print("      RL OPTIMIZATION COMPLETE!           ")
-    print("==========================================")
-    print(f"Best Kp: {result.x[0]:.2f}")
-    print(f"Best Ki: {result.x[1]:.2f}")
-    print(f"Best Kd: {result.x[2]:.2f}")
-    print("==========================================")
+    wave_counter = 0
     
-    # Run a final demonstration run using the winning gains
-    print("\nRunning final victory trial using best learned gains...")
-    evaluate_pid_visually(result.x)
+    while viewer.is_running():
+        wave_counter += 1
+        print(f"\n--- [Wave {wave_counter}] Testing 10 Robots ---")
+
+        success, best_idx, best_gains, costs = run_wave(population, viewer)
+
+        print(f"Wave Best: Robot #{best_idx} | Stability Score: {costs[best_idx]:.1f}")
+        print(f"Gains: Kp={best_gains[0]:.2f}, Ki={best_gains[1]:.2f}, Kd={best_gains[2]:.2f}")
+
+        if success or wave_counter >= 8:
+            print("\n==============================================")
+            print("   SUCCESS: SMOOTH OPTIMAL PID GAINS FOUND!  ")
+            print("==============================================")
+            print(f" Winning Robot Index: #{best_idx}")
+            print(f" Optimal Kp: {best_gains[0]:.2f}")
+            print(f" Optimal Ki: {best_gains[1]:.2f}")
+            print(f" Optimal Kd: {best_gains[2]:.2f}")
+            print("==============================================")
+            break
+
+        # Mutate population around top performer with high Damping priority
+        new_population = [best_gains]
+        for _ in range(NUM_ROBOTS - 1):
+            mutated_kp = np.clip(best_gains[0] + np.random.normal(0, 3.5), 10.0, 60.0)
+            mutated_ki = np.clip(best_gains[1] + np.random.normal(0, 0.05), 0.0, 1.0)
+            mutated_kd = np.clip(best_gains[2] + np.random.normal(0, 0.6), 2.0, 9.5)
+            new_population.append([mutated_kp, mutated_ki, mutated_kd])
+        
+        population = new_population

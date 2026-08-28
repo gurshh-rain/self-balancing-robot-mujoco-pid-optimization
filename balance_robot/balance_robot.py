@@ -11,10 +11,14 @@ xml_path = script_dir / "models" / "inverted_pendulum.xml"
 model = mujoco.MjModel.from_xml_path(str(xml_path))
 data = mujoco.MjData(model)
 
-# Actuator & Joint IDs
-left_motor_id = model.actuator("left_motor").id
-right_motor_id = model.actuator("right_motor").id
-chassis_id = model.body("chassis").id
+# Actuator & Body IDs targeting Robot 0 from the multi-robot XML
+left_motor_id = model.actuator("lm_0").id
+right_motor_id = model.actuator("rm_0").id
+chassis_id = model.body("chassis_0").id
+
+# Addresses for freejoint qpos and qvel corresponding to Robot 0
+qpos_adr = model.jnt_qposadr[model.body("chassis_0").jntadr[0]]
+qvel_adr = model.jnt_dofadr[model.body("chassis_0").jntadr[0]]
 
 # --- CASCADED CONTROL GAINS ---
 
@@ -23,9 +27,9 @@ Kp_pos = 0.12        # Reduced so it doesn't over-react
 Kd_pos = 0.25        # Velocity damping on position
 
 # Inner Loop: Pitch Control (Maps Pitch error -> Wheel Torque)
-Kp_pitch = 0      # Smooth Proportional gain
-Ki_pitch = 0       # Integral gain for steady-state offset
-Kd_pitch = 0       # Damping gain acting directly on angular velocity
+Kp_pitch = 60.00     # Smooth Proportional gain
+Ki_pitch = 0.23      # Integral gain for steady-state offset
+Kd_pitch = 2.00      # Damping gain acting directly on angular velocity
 
 integral_pitch_error = 0.0
 target_pitch_filtered = 0.0
@@ -39,13 +43,13 @@ def get_chassis_pitch(data, body_id):
 # --- RESET SIMULATION STATE ---
 mujoco.mj_resetData(model, data)
 
-# Spawn robot at X=0, sitting on ground
-data.qpos[0] = 0.0   # X position
-data.qpos[1] = 0.0   # Y position
-data.qpos[2] = 0.08  # Z height (Wheels touching ground)
+# Spawn robot 0 at its default position
+data.qpos[qpos_adr + 0] = 0.0     # X position
+data.qpos[qpos_adr + 1] = -2.0    # Y position (matches chassis_0 grid spot)
+data.qpos[qpos_adr + 2] = 0.08    # Z height (Wheels touching ground)
 
 # JOLT FEATURE: Apply smooth initial linear impulse (Vx = 1.0 m/s)
-data.qvel[0] = 1.0   
+data.qvel[qvel_adr + 0] = 1.0   
 
 mujoco.mj_forward(model, data)
 
@@ -55,14 +59,14 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         step_start = time.time()
 
         # -------------------------------------------------------------
-        # 1. READ RAW SENSOR STATES (No Numerical Differentiation Needed)
+        # 1. READ RAW SENSOR STATES
         # -------------------------------------------------------------
-        current_x = data.qpos[0]                         # Robot X position
-        current_vx = data.qvel[0]                        # Forward velocity (m/s)
-        current_pitch = get_chassis_pitch(data, chassis_id) # Pitch angle (rad)
+        current_x = data.qpos[qpos_adr + 0]                         # Robot X position
+        current_vx = data.qvel[qvel_adr + 0]                        # Forward velocity (m/s)
+        current_pitch = get_chassis_pitch(data, chassis_id)        # Pitch angle (rad)
         
-        # Freejoint rotational velocity index 4 corresponds to Y-axis pitch velocity (rad/s)
-        pitch_velocity = data.qvel[4]                    
+        # Freejoint Y-axis pitch velocity (rad/s) relative to robot 0's DOFs
+        pitch_velocity = data.qvel[qvel_adr + 4]                    
 
         # -------------------------------------------------------------
         # 2. OUTER LOOP (Position -> Smooth Target Pitch)

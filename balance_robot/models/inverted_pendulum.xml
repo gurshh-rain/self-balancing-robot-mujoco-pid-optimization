@@ -1,75 +1,205 @@
-<mujoco model="two_wheeled_robot">
+<mujoco model="ten_wheeled_robots">
   <compiler angle="degree"/>
   <option timestep="0.005" gravity="0 0 -9.81"/>
 
   <asset>
-    <!-- Checkerboard floor texture for clear visual motion tracking -->
     <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1="0.1 0.1 0.1" rgb2="0.95 0.95 0.95"/>
-    <material name="grid_mat" texture="grid" texrepeat="5 5" reflectance="0.1"/>
+    <material name="grid_mat" texture="grid" texrepeat="10 10" reflectance="0.1"/>
     
-    <!-- Monochrome Materials -->
     <material name="matte_black" rgba="0.1 0.1 0.1 1" shininess="0.1"/>
     <material name="dark_grey" rgba="0.25 0.25 0.25 1" shininess="0.3"/>
-    <material name="light_grey" rgba="0.65 0.65 0.65 1" shininess="0.5"/>
     <material name="bright_white" rgba="0.95 0.95 0.95 1" shininess="0.8"/>
+    <material name="winner_gold" rgba="1.0 0.8 0.0 1" shininess="0.9"/>
   </asset>
 
   <default>
-    <!-- High friction on wheels so they roll without slipping -->
     <geom friction="1.5 0.005 0.0001" contype="1" conaffinity="1"/>
   </default>
 
   <worldbody>
-    <!-- Floor plane sitting at Z = 0 -->
-    <geom name="floor" type="plane" size="5 5 0.1" material="grid_mat"/>
-    
-    <!-- Main Chassis Body placed at wheel hub level (Z = 0.08) -->
-    <body name="chassis" pos="0 0 0.08">
-      <freejoint name="root"/>
-      
-      <!-- Center Axle Rod connecting wheels -->
-      <geom name="axle" type="cylinder" size="0.015 0.13" zaxis="0 1 0" material="dark_grey" mass="0.1"/>
+    <geom name="floor" type="plane" size="10 10 0.1" material="grid_mat"/>
 
-      <!-- Main Chassis Box (Matte Black) -->
-      <geom name="chassis_box" type="box" size="0.08 0.10 0.2" mass="1.3" material="matte_black" pos="0 0 0.22"/>
-      
-      <!-- Decorative Side Inset Panels (Bright White) -->
-      <geom name="panel_left" type="box" size="0.081 0.002 0.16" mass="0.02" material="bright_white" pos="0 0.101 0.22"/>
-      <geom name="panel_right" type="box" size="0.081 0.002 0.16" mass="0.02" material="bright_white" pos="0 -0.101 0.22"/>
-
-      <!-- Top Sensor Deck & Status Dome -->
-      <geom name="top_plate" type="box" size="0.085 0.105 0.01" mass="0.05" material="dark_grey" pos="0 0 0.43"/>
-      <geom name="sensor_dome" type="sphere" size="0.03" mass="0.01" material="bright_white" pos="0 0 0.45"/>
-
-      <!-- Left Wheel Assembly (White Rim, Dark Hub, Black Rubber Tire) -->
-      <body name="left_wheel" pos="0 0.14 0">
-        <joint name="left_wheel_joint" type="hinge" axis="0 1 0"/>
-        <!-- Main Outer Tire -->
-        <geom name="left_wheel_geom" type="cylinder" size="0.08 0.02" zaxis="0 1 0" mass="0.15" material="matte_black"/>
-        <!-- Inner Rim Detail -->
-        <geom name="left_wheel_rim" type="cylinder" size="0.05 0.021" zaxis="0 1 0" mass="0.05" material="bright_white"/>
-        <geom name="left_wheel_hub" type="cylinder" size="0.02 0.022" zaxis="0 1 0" mass="0.01" material="dark_grey"/>
+    <!-- ROBOT 0 (Y = -2.0) -->
+    <body name="chassis_0" pos="0 -2.0 0.08">
+      <freejoint name="root_0"/>
+      <geom name="axle_0" type="cylinder" size="0.015 0.13" zaxis="0 1 0" material="dark_grey" mass="0.1"/>
+      <geom name="box_0" type="box" size="0.08 0.10 0.2" mass="1.3" material="matte_black" pos="0 0 0.22"/>
+      <geom name="top_0" type="sphere" size="0.03" mass="0.01" material="bright_white" pos="0 0 0.45"/>
+      <body name="lw_0" pos="0 0.14 0">
+        <joint name="lw_j_0" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" mass="0.15" material="matte_black"/>
       </body>
+      <body name="rw_0" pos="0 -0.14 0">
+        <joint name="rw_j_0" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" mass="0.15" material="matte_black"/>
+      </body>
+    </body>
 
-      <!-- Right Wheel Assembly (White Rim, Dark Hub, Black Rubber Tire) -->
-      <body name="right_wheel" pos="0 -0.14 0">
-        <joint name="right_wheel_joint" type="hinge" axis="0 1 0"/>
-        <!-- Main Outer Tire -->
-        <geom name="right_wheel_geom" type="cylinder" size="0.08 0.02" zaxis="0 1 0" mass="0.15" material="matte_black"/>
-        <!-- Inner Rim Detail -->
-        <geom name="right_wheel_rim" type="cylinder" size="0.05 0.021" zaxis="0 1 0" mass="0.05" material="bright_white"/>
-        <geom name="right_wheel_hub" type="cylinder" size="0.02 0.022" zaxis="0 1 0" mass="0.01" material="dark_grey"/>
+    <!-- ROBOT 1 (Y = -1.5) -->
+    <body name="chassis_1" pos="0 -1.5 0.08">
+      <freejoint name="root_1"/>
+      <geom name="axle_1" type="cylinder" size="0.015 0.13" zaxis="0 1 0" material="dark_grey" mass="0.1"/>
+      <geom name="box_1" type="box" size="0.08 0.10 0.2" mass="1.3" material="matte_black" pos="0 0 0.22"/>
+      <geom name="top_1" type="sphere" size="0.03" mass="0.01" material="bright_white" pos="0 0 0.45"/>
+      <body name="lw_1" pos="0 0.14 0">
+        <joint name="lw_j_1" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" mass="0.15" material="matte_black"/>
+      </body>
+      <body name="rw_1" pos="0 -0.14 0">
+        <joint name="rw_j_1" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" mass="0.15" material="matte_black"/>
+      </body>
+    </body>
+
+    <!-- ROBOT 2 (Y = -1.0) -->
+    <body name="chassis_2" pos="0 -1.0 0.08">
+      <freejoint name="root_2"/>
+      <geom name="axle_2" type="cylinder" size="0.015 0.13" zaxis="0 1 0" material="dark_grey" mass="0.1"/>
+      <geom name="box_2" type="box" size="0.08 0.10 0.2" mass="1.3" material="matte_black" pos="0 0 0.22"/>
+      <geom name="top_2" type="sphere" size="0.03" mass="0.01" material="bright_white" pos="0 0 0.45"/>
+      <body name="lw_2" pos="0 0.14 0">
+        <joint name="lw_j_2" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" mass="0.15" material="matte_black"/>
+      </body>
+      <body name="rw_2" pos="0 -0.14 0">
+        <joint name="rw_j_2" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" mass="0.15" material="matte_black"/>
+      </body>
+    </body>
+
+    <!-- ROBOT 3 (Y = -0.5) -->
+    <body name="chassis_3" pos="0 -0.5 0.08">
+      <freejoint name="root_3"/>
+      <geom name="axle_3" type="cylinder" size="0.015 0.13" zaxis="0 1 0" material="dark_grey" mass="0.1"/>
+      <geom name="box_3" type="box" size="0.08 0.10 0.2" mass="1.3" material="matte_black" pos="0 0 0.22"/>
+      <geom name="top_3" type="sphere" size="0.03" mass="0.01" material="bright_white" pos="0 0 0.45"/>
+      <body name="lw_3" pos="0 0.14 0">
+        <joint name="lw_j_3" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" material="matte_black"/>
+      </body>
+      <body name="rw_3" pos="0 -0.14 0">
+        <joint name="rw_j_3" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" material="matte_black"/>
+      </body>
+    </body>
+
+    <!-- ROBOT 4 (Y = 0.0) -->
+    <body name="chassis_4" pos="0 0.0 0.08">
+      <freejoint name="root_4"/>
+      <geom name="axle_4" type="cylinder" size="0.015 0.13" zaxis="0 1 0" material="dark_grey" mass="0.1"/>
+      <geom name="box_4" type="box" size="0.08 0.10 0.2" mass="1.3" material="matte_black" pos="0 0 0.22"/>
+      <geom name="top_4" type="sphere" size="0.03" mass="0.01" material="bright_white" pos="0 0 0.45"/>
+      <body name="lw_4" pos="0 0.14 0">
+        <joint name="lw_j_4" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" material="matte_black"/>
+      </body>
+      <body name="rw_4" pos="0 -0.14 0">
+        <joint name="rw_j_4" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" material="matte_black"/>
+      </body>
+    </body>
+
+    <!-- ROBOT 5 (Y = 0.5) -->
+    <body name="chassis_5" pos="0 0.5 0.08">
+      <freejoint name="root_5"/>
+      <geom name="axle_5" type="cylinder" size="0.015 0.13" zaxis="0 1 0" material="dark_grey" mass="0.1"/>
+      <geom name="box_5" type="box" size="0.08 0.10 0.2" mass="1.3" material="matte_black" pos="0 0 0.22"/>
+      <geom name="top_5" type="sphere" size="0.03" mass="0.01" material="bright_white" pos="0 0 0.45"/>
+      <body name="lw_5" pos="0 0.14 0">
+        <joint name="lw_j_5" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" material="matte_black"/>
+      </body>
+      <body name="rw_5" pos="0 -0.14 0">
+        <joint name="rw_j_5" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" material="matte_black"/>
+      </body>
+    </body>
+
+    <!-- ROBOT 6 (Y = 1.0) -->
+    <body name="chassis_6" pos="0 1.0 0.08">
+      <freejoint name="root_6"/>
+      <geom name="axle_6" type="cylinder" size="0.015 0.13" zaxis="0 1 0" material="dark_grey" mass="0.1"/>
+      <geom name="box_6" type="box" size="0.08 0.10 0.2" mass="1.3" material="matte_black" pos="0 0 0.22"/>
+      <geom name="top_6" type="sphere" size="0.03" mass="0.01" material="bright_white" pos="0 0 0.45"/>
+      <body name="lw_6" pos="0 0.14 0">
+        <joint name="lw_j_6" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" material="matte_black"/>
+      </body>
+      <body name="rw_6" pos="0 -0.14 0">
+        <joint name="rw_j_6" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" material="matte_black"/>
+      </body>
+    </body>
+
+    <!-- ROBOT 7 (Y = 1.5) -->
+    <body name="chassis_7" pos="0 1.5 0.08">
+      <freejoint name="root_7"/>
+      <geom name="axle_7" type="cylinder" size="0.015 0.13" zaxis="0 1 0" material="dark_grey" mass="0.1"/>
+      <geom name="box_7" type="box" size="0.08 0.10 0.2" mass="1.3" material="matte_black" pos="0 0 0.22"/>
+      <geom name="top_7" type="sphere" size="0.03" mass="0.01" material="bright_white" pos="0 0 0.45"/>
+      <body name="lw_7" pos="0 0.14 0">
+        <joint name="lw_j_7" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" material="matte_black"/>
+      </body>
+      <body name="rw_7" pos="0 -0.14 0">
+        <joint name="rw_j_7" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" material="matte_black"/>
+      </body>
+    </body>
+
+    <!-- ROBOT 8 (Y = 2.0) -->
+    <body name="chassis_8" pos="0 2.0 0.08">
+      <freejoint name="root_8"/>
+      <geom name="axle_8" type="cylinder" size="0.015 0.13" zaxis="0 1 0" material="dark_grey" mass="0.1"/>
+      <geom name="box_8" type="box" size="0.08 0.10 0.2" mass="1.3" material="matte_black" pos="0 0 0.22"/>
+      <geom name="top_8" type="sphere" size="0.03" mass="0.01" material="bright_white" pos="0 0 0.45"/>
+      <body name="lw_8" pos="0 0.14 0">
+        <joint name="lw_j_8" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" material="matte_black"/>
+      </body>
+      <body name="rw_8" pos="0 -0.14 0">
+        <joint name="rw_j_8" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" material="matte_black"/>
+      </body>
+    </body>
+
+    <!-- ROBOT 9 (Y = 2.5) -->
+    <body name="chassis_9" pos="0 2.5 0.08">
+      <freejoint name="root_9"/>
+      <geom name="axle_9" type="cylinder" size="0.015 0.13" zaxis="0 1 0" material="dark_grey" mass="0.1"/>
+      <geom name="box_9" type="box" size="0.08 0.10 0.2" mass="1.3" material="matte_black" pos="0 0 0.22"/>
+      <geom name="top_9" type="sphere" size="0.03" mass="0.01" material="bright_white" pos="0 0 0.45"/>
+      <body name="lw_9" pos="0 0.14 0">
+        <joint name="lw_j_9" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" material="matte_black"/>
+      </body>
+      <body name="rw_9" pos="0 -0.14 0">
+        <joint name="rw_j_9" type="hinge" axis="0 1 0"/>
+        <geom type="cylinder" size="0.08 0.02" zaxis="0 1 0" material="matte_black"/>
       </body>
     </body>
   </worldbody>
 
-  <contact>
-    <exclude body1="chassis" body2="left_wheel"/>
-    <exclude body1="chassis" body2="right_wheel"/>
-  </contact>
-
   <actuator>
-    <motor joint="left_wheel_joint" name="left_motor" gear="1" ctrlrange="-10 10"/>
-    <motor joint="right_wheel_joint" name="right_motor" gear="1" ctrlrange="-10 10"/>
+    <motor joint="lw_j_0" name="lm_0" gear="1" ctrlrange="-10 10"/>
+    <motor joint="rw_j_0" name="rm_0" gear="1" ctrlrange="-10 10"/>
+    <motor joint="lw_j_1" name="lm_1" gear="1" ctrlrange="-10 10"/>
+    <motor joint="rw_j_1" name="rm_1" gear="1" ctrlrange="-10 10"/>
+    <motor joint="lw_j_2" name="lm_2" gear="1" ctrlrange="-10 10"/>
+    <motor joint="rw_j_2" name="rm_2" gear="1" ctrlrange="-10 10"/>
+    <motor joint="lw_j_3" name="lm_3" gear="1" ctrlrange="-10 10"/>
+    <motor joint="rw_j_3" name="rm_3" gear="1" ctrlrange="-10 10"/>
+    <motor joint="lw_j_4" name="lm_4" gear="1" ctrlrange="-10 10"/>
+    <motor joint="rw_j_4" name="rm_4" gear="1" ctrlrange="-10 10"/>
+    <motor joint="lw_j_5" name="lm_5" gear="1" ctrlrange="-10 10"/>
+    <motor joint="rw_j_5" name="rm_5" gear="1" ctrlrange="-10 10"/>
+    <motor joint="lw_j_6" name="lm_6" gear="1" ctrlrange="-10 10"/>
+    <motor joint="rw_j_6" name="rm_6" gear="1" ctrlrange="-10 10"/>
+    <motor joint="lw_j_7" name="lm_7" gear="1" ctrlrange="-10 10"/>
+    <motor joint="rw_j_7" name="rm_7" gear="1" ctrlrange="-10 10"/>
+    <motor joint="lw_j_8" name="lm_8" gear="1" ctrlrange="-10 10"/>
+    <motor joint="rw_j_8" name="rm_8" gear="1" ctrlrange="-10 10"/>
+    <motor joint="lw_j_9" name="lm_9" gear="1" ctrlrange="-10 10"/>
+    <motor joint="rw_j_9" name="rm_9" gear="1" ctrlrange="-10 10"/>
   </actuator>
 </mujoco>
